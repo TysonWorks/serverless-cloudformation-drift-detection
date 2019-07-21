@@ -17,6 +17,5 @@ Deploy
 ``` sls deploy --stage dev --region us-west-2 --profile my-profile```
 
 
- 
-You might see drift detection requests getting failed due to rate limits exceeded, create a support ticket to increase that limit.
+__You might see drift detection requests getting failed due to rate limits exceeded, create a support ticket to increase that limit.__
 
