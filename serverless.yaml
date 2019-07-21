@@ -1,0 +1,42 @@
+service: cloudformation-drift-detection
+
+custom:
+  regions: "us-east-1,us-east-2,us-west-1,us-west-2"
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  stage: ${opt:stage, "dev"}
+  region: ${opt:region, "us-west-1"}
+  profile: ${opt:profile, "dev"}
+
+  environment:
+    REGION: ${self:provider.region}
+    SLACK_URL: ${env:SLACK_URL}
+    REGIONS: ${env:REGIONS, self:custom.regions}
+
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - cloudformation:DescribeStacks
+        - cloudformation:DetectStackDrift
+        - cloudformation:DescribeStackDriftDetectionStatus
+        - cloudformation:DescribeStackResourceDrifts
+        - cloudformation:ListStackResources
+        - cloudformation:DetectStackResourceDrift
+      Resource: "*"
+
+functions:
+  driftDetection:
+    handler: handlers.detectDriftsHandler 
+    timeout: 900
+    memory: 512
+    events:
+      - schedule: 
+          rate: rate(12 hours)
+          enabled: true
+          input:
+            # Execution will be stopped peridocally to avoid hitting rate limits
+            sleepBetweenRounds: 15 #seconds
+            numOfRounds: 10
+            sleepBetweenDetectionCalls: 3 #seconds
