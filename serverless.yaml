@@ -37,6 +37,6 @@ functions:
           enabled: true
           input:
             # Execution will be stopped peridocally to avoid hitting rate limits
-            sleepBetweenRounds: 15 #seconds
-            numOfRounds: 10
-            sleepBetweenDetectionCalls: 3 #seconds
+            sleepBetweenRounds: ${env:SLEEP_BETWEEN_ROUNDS, 30} #seconds
+            numOfRounds: ${env:NUM_OF_ROUNDS, 10}
+            sleepBetweenAPICalls: ${env:SLEEP_BETWEEN_API_CALLS, 3} #seconds

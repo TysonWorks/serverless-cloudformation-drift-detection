@@ -11,15 +11,15 @@ export async function detectDriftsHandler(event, context, callback) {
     try {
         const numOfRounds = +event["numOfRounds"];
         const sleepBetweenRounds = +event["sleepBetweenRounds"];
-        const sleepBetweenDetectionCalls = +event["sleepBetweenDetectionCalls"];
-        await detectDrifts(numOfRounds, sleepBetweenRounds, sleepBetweenDetectionCalls);
+        const sleepBetweenAPICalls = +event["sleepBetweenAPICalls"];
+        await detectDrifts(numOfRounds, sleepBetweenRounds, sleepBetweenAPICalls);
     } catch(err) {
         console.error(err);
         callback("Internal error");
     }
 }
 
-async function detectDrifts(numOfRounds, sleepBetweenRounds, sleepBetweenDetectionCalls){
+async function detectDrifts(numOfRounds, sleepBetweenRounds, sleepBetweenAPICalls){
     for(const region of regions){
         console.log("Examining region", region);
         const cloudformation = new CloudFormation({region});
@@ -28,31 +28,34 @@ async function detectDrifts(numOfRounds, sleepBetweenRounds, sleepBetweenDetecti
         const driftDetections = []
         for(const stack of stacks){
             if(!isStackInTransition(stack.StackStatus)){
-                /* You might see drift detection requests getting failed due to rate limits exceeded, 
-                create a support ticket to increase that limit
-                */
-                await sleep(sleepBetweenDetectionCalls);
+                await sleep(sleepBetweenAPICalls * 1000);
                 const res = await cloudformation.detectStackDrift({StackName: stack.StackName}).promise()
                 driftDetections.push({driftDetectionId: res.StackDriftDetectionId, stackName: stack.StackName})
             }
         }
         for(let i=0; i < numOfRounds; i++) {
-            if(driftDetections.length < 1){
+            if(driftDetections.length < 1) {
                 break;
             }
             console.log("Round", i + 1);
             await sleep(sleepBetweenRounds * 1000);
             for(const driftIndex in driftDetections){
                 const driftDetection = driftDetections[driftIndex];
+                // await sleep(sleepBetweenAPICalls * 1000);
                 const driftStatus = await cloudformation.describeStackDriftDetectionStatus({StackDriftDetectionId: driftDetection.driftDetectionId}).promise()
-                console.log("driftStatus", driftStatus); 
-                if(driftStatus.DetectionStatus !== "DETECTION_IN_PROGRESS" && driftStatus.StackDriftStatus === "DRIFTED"){
-                    const resourceDrifts = await cloudformation.describeStackResourceDrifts({StackName: driftDetection.stackName, StackResourceDriftStatusFilters: ["IN_SYNC", "MODIFIED", "DELETED"]}).promise();
-                    const url = `https://${region}.console.aws.amazon.com/cloudformation/home?region=${region}#/stack/detail?stackId=${driftStatus.StackId}`;
-                    const message = `Cloudformation Drift detected for the stack: ${url}`;
-                    await sendSlackMessage({message, data: resourceDrifts, url});
-                    console.log(`Slack message sent for stack: ${driftDetection.stackName}`)
-                    driftDetections.splice(driftIndex, 1);
+                console.log("driftStatus", driftStatus);
+                if(driftStatus.DetectionStatus !== "DETECTION_IN_PROGRESS" ){
+                    if(driftStatus.StackDriftStatus === "DRIFTED"){
+                        const resourceDrifts = await cloudformation.describeStackResourceDrifts({StackName: driftDetection.stackName, StackResourceDriftStatusFilters: ["IN_SYNC", "MODIFIED", "DELETED"]}).promise();
+                        const url = `https://${region}.console.aws.amazon.com/cloudformation/home?region=${region}#/stack/detail?stackId=${driftStatus.StackId}`;
+                        const message = `Cloudformation Drift detected for the stack: ${url}`;
+                        await sendSlackMessage({message, data: resourceDrifts, url});
+                        console.log(`Slack message sent for stack: ${driftDetection.stackName}`)
+                        driftDetections.splice(driftIndex, 1);
+                    } else {
+                        console.log("Not drifted, removing from the list");
+                        driftDetections.splice(driftIndex, 1);
+                    }
                 }
             }
         }

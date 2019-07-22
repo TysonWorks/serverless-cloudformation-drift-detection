@@ -9,8 +9,12 @@ Configure `serverless.yaml` file
 Set environment variables
 
 ```
+
 export REGIONS="us-west-1,us-west-2,us-east-1,us-east-2"
 export SLACK_URL="https://hooks.slack.com/services/replace/replace/replace"
+export SLEEP_BETWEEN_ROUNDS=30
+export SLEEP_BETWEEN_API_CALLS=5
+export NUM_OF_ROUNDS=5
 ```
 Deploy
 
